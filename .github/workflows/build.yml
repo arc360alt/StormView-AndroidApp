@@ -29,12 +29,22 @@ jobs:
       - name: Rename Debug APK
         run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/StormView-debug.apk
 
+      - name: Set release tag
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "value=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=manual-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: StormView ${{ github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: StormView ${{ steps.tag.outputs.value }}
           body: |
-            ## StormView ${{ github.ref_name }}
+            ## StormView ${{ steps.tag.outputs.value }}
 
             > ⚠️ This is a debug build — for personal use only.
 
