@@ -5,4 +5,4 @@ A Kotlin baised android app for StormView
 - Offline Detection
 - Easy use as you can just click the icon instead of going to a website
 - Full on GPS Intigration
-- *widgets* (Coming Soon)
+- Widgets
