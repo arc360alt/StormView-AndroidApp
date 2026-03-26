@@ -97,19 +97,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPage() {
-        if (isWifiConnected()) {
+        if (isInternetConnected()) {
             webView.loadUrl("https://weather.arc360hub.com")
         } else {
             webView.loadUrl("file:///android_asset/offline.html")
         }
     }
 
-    private fun isWifiConnected(): Boolean {
+    private fun isInternetConnected(): Boolean {
         val connectivityManager =
             getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities =
             connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+            || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     }
 }
