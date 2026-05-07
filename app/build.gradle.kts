@@ -15,12 +15,28 @@ tasks.register("fetchAndBuildWebApp") {
 
     fun run(vararg cmd: String, dir: File = webAppDir) {
         val command = if (isWindows) listOf("cmd", "/c") + cmd.toList() else cmd.toList()
-        val result = ProcessBuilder(command)
+
+        val pb = ProcessBuilder(command)
             .directory(dir)
-            .inheritIO()
-            .start()
-            .waitFor()
-        if (result != 0) throw GradleException("Command failed (exit $result): ${command.joinToString(" ")}")
+            .redirectErrorStream(true) // merge stderr into stdout so it shows in Gradle output
+
+        // Inherit the full environment, then ensure PATH includes common npm locations
+        val env = pb.environment()
+        val extraPaths = listOf(
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            System.getenv("HOME")?.let { "$it/.nvm/versions/node/$(node -v 2>/dev/null)/bin" }
+        ).filterNotNull()
+        env["PATH"] = (env["PATH"] ?: "") + ":" + extraPaths.joinToString(":")
+
+        val process = pb.start()
+
+        // Stream output live to Gradle's logger
+        process.inputStream.bufferedReader().forEachLine { println(it) }
+
+        val exit = process.waitFor()
+        if (exit != 0) throw GradleException("Command failed (exit $exit): ${command.joinToString(" ")}")
     }
 
     doLast {
@@ -34,9 +50,6 @@ tasks.register("fetchAndBuildWebApp") {
         }
 
         // ---- 2. Read VITE_ keys from local.properties and write .env ----
-        // Add your keys to local.properties (it's gitignored) like:
-        //   VITE_MAPTILER_KEY=your-key-here
-        //   VITE_OTHER_KEY=your-other-key-here
         val localProps = Properties()
         val localPropsFile = file("${rootProject.projectDir}/local.properties")
         if (localPropsFile.exists()) {
@@ -52,7 +65,7 @@ tasks.register("fetchAndBuildWebApp") {
             println("No VITE_ keys found in local.properties — skipping .env")
         }
 
-        // ---- 3. Patch vite.config.js — React plugin + base: './' ----
+        // ---- 3. Patch vite.config.js ----
         file("${webAppDir}/vite.config.js").writeText(
             """
             import { defineConfig } from 'vite'
@@ -67,10 +80,20 @@ tasks.register("fetchAndBuildWebApp") {
         println("Patched vite.config.js")
 
         // ---- 4. npm install + build ----
+        // Resolve npm binary explicitly to avoid PATH issues in CI
+        val npmBin = listOf(
+            "/usr/local/bin/npm",
+            "/usr/bin/npm",
+            "npm"
+        ).firstOrNull { path ->
+            path == "npm" || file(path).exists()
+        } ?: "npm"
+
+        println("Using npm at: $npmBin")
         println("Running npm install...")
-        run("npm", "install")
+        run(npmBin, "install", "--prefer-offline")
         println("Running npm run build...")
-        run("npm", "run", "build")
+        run(npmBin, "run", "build")
 
         // ---- 5. Sync dist/ → assets/www/ ----
         val distDir = file("${webAppDir}/dist")

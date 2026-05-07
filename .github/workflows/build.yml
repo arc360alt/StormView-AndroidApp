@@ -24,6 +24,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Verify Node and npm
+        run: |
+          echo "node: $(which node) — $(node --version)"
+          echo "npm:  $(which npm) — $(npm --version)"
+
       - name: Write API keys to local.properties
         run: |
           echo "VITE_MAPTILER_KEY=${{ secrets.VITE_MAPTILER_KEY }}" >> local.properties
