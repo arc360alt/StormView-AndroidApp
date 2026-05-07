@@ -15,38 +15,36 @@ tasks.register("fetchAndBuildWebApp") {
 
     fun run(vararg cmd: String, dir: File = webAppDir) {
         val command = if (isWindows) listOf("cmd", "/c") + cmd.toList() else cmd.toList()
-
         val pb = ProcessBuilder(command)
             .directory(dir)
-            .redirectErrorStream(true) // merge stderr into stdout so it shows in Gradle output
-
-        // Inherit the full environment, then ensure PATH includes common npm locations
-        val env = pb.environment()
-        val extraPaths = listOf(
-            "/usr/local/bin",
-            "/usr/bin",
-            "/bin",
-            System.getenv("HOME")?.let { "$it/.nvm/versions/node/$(node -v 2>/dev/null)/bin" }
-        ).filterNotNull()
-        env["PATH"] = (env["PATH"] ?: "") + ":" + extraPaths.joinToString(":")
-
+            .redirectErrorStream(true)
         val process = pb.start()
-
-        // Stream output live to Gradle's logger
         process.inputStream.bufferedReader().forEachLine { println(it) }
-
         val exit = process.waitFor()
         if (exit != 0) throw GradleException("Command failed (exit $exit): ${command.joinToString(" ")}")
     }
 
     doLast {
         // ---- 1. Clone or pull ----
+        // Validate the existing folder actually has package.json before trusting it.
+        // If not, wipe and re-clone.
+        val packageJson = file("${webAppDir}/package.json")
+        if (webAppDir.exists() && !packageJson.exists()) {
+            println("web-app-source exists but package.json is missing — wiping and re-cloning...")
+            webAppDir.deleteRecursively()
+        }
+
         if (!webAppDir.exists()) {
             println("Cloning weather web app...")
             run("git", "clone", repoUrl, webAppDir.absolutePath, dir = rootProject.projectDir)
         } else {
             println("Pulling latest weather web app...")
             run("git", "pull")
+        }
+
+        // Sanity check
+        if (!packageJson.exists()) {
+            throw GradleException("Clone succeeded but package.json still missing at ${packageJson.absolutePath}")
         }
 
         // ---- 2. Read VITE_ keys from local.properties and write .env ----
@@ -80,18 +78,12 @@ tasks.register("fetchAndBuildWebApp") {
         println("Patched vite.config.js")
 
         // ---- 4. npm install + build ----
-        // Resolve npm binary explicitly to avoid PATH issues in CI
-        val npmBin = listOf(
-            "/usr/local/bin/npm",
-            "/usr/bin/npm",
-            "npm"
-        ).firstOrNull { path ->
-            path == "npm" || file(path).exists()
-        } ?: "npm"
+        val npmBin = listOf("/usr/local/bin/npm", "/usr/bin/npm", "npm")
+            .firstOrNull { it == "npm" || file(it).exists() } ?: "npm"
 
         println("Using npm at: $npmBin")
         println("Running npm install...")
-        run(npmBin, "install", "--prefer-offline")
+        run(npmBin, "install")
         println("Running npm run build...")
         run(npmBin, "run", "build")
 
