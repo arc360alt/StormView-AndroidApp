@@ -1,14 +1,12 @@
 package com.example.stormview
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -16,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,10 +27,18 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
 
+        // Serves assets via https://appassets.androidplatform.net/assets/www/
+        // so the page has a real https origin — fixes the CORS block on file://
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
-        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+        webView.settings.cacheMode = WebSettings.LOAD_DEFAULT
         webView.settings.setGeolocationEnabled(true)
+        // No need for MIXED_CONTENT_ALWAYS_ALLOW — everything goes through https now
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
@@ -43,6 +50,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                // Let the asset loader handle requests to appassets.androidplatform.net
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
@@ -51,7 +66,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Modern back button handling (replaces deprecated onBackPressed)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) {
@@ -97,20 +111,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPage() {
-        if (isInternetConnected()) {
-            webView.loadUrl("https://weather.arc360hub.com")
-        } else {
-            webView.loadUrl("file:///android_asset/offline.html")
-        }
-    }
-
-    private fun isInternetConnected(): Boolean {
-        val connectivityManager =
-            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities =
-            connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-            || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        // Load via the asset loader's https origin, not file://
+        // Path: /assets/ maps to app/src/main/assets/, so www/index.html lives at /assets/www/index.html
+        webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
     }
 }

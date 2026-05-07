@@ -1,18 +1,14 @@
 name: Build & Release StormView
-
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,6 +18,17 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Write API keys to local.properties
+        run: |
+          echo "VITE_MAPTILER_KEY=${{ secrets.VITE_MAPTILER_KEY }}" >> local.properties
+          # Add more keys here as needed:
+          # echo "VITE_OTHER_KEY=${{ secrets.VITE_OTHER_KEY }}" >> local.properties
 
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
@@ -48,9 +55,7 @@ jobs:
           name: StormView ${{ steps.tag.outputs.value }}
           body: |
             ## StormView ${{ steps.tag.outputs.value }}
-
             > ⚠️ This is a debug build — for personal use only.
-
             ### Installation
             1. Download `StormView-debug.apk` below
             2. Transfer to your Android device
