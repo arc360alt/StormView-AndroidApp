@@ -27,9 +27,10 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
 
-        // Serves assets via https://appassets.androidplatform.net/assets/www/
-        // so the page has a real https origin — fixes the CORS block on file://
+        // Serve assets under the proxy's allowed origin so the WebView sends
+        // Origin: https://weather.arc360hub.com on every request to the proxy.
         val assetLoader = WebViewAssetLoader.Builder()
+            .setDomain("weather.arc360hub.com")
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
@@ -111,8 +112,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPage() {
-        // Load via the asset loader's https origin, not file://
-        // Path: /assets/ maps to app/src/main/assets/, so www/index.html lives at /assets/www/index.html
-        webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
+        webView.loadUrl("https://weather.arc360hub.com/assets/www/index.html")
     }
 }
