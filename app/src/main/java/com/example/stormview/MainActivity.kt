@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,7 +13,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.webkit.WebViewAssetLoader
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,19 +25,10 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
 
-        // Serve assets under the proxy's allowed origin so the WebView sends
-        // Origin: https://weather.arc360hub.com on every request to the proxy.
-        val assetLoader = WebViewAssetLoader.Builder()
-            .setDomain("weather.arc360hub.com")
-            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
-            .build()
-
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.cacheMode = WebSettings.LOAD_DEFAULT
         webView.settings.setGeolocationEnabled(true)
-        // No need for MIXED_CONTENT_ALWAYS_ALLOW — everything goes through https now
-        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
@@ -51,14 +40,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest
-            ): WebResourceResponse? {
-                // Let the asset loader handle requests to appassets.androidplatform.net
-                return assetLoader.shouldInterceptRequest(request.url)
-            }
-
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
@@ -112,6 +93,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPage() {
-        webView.loadUrl("https://weather.arc360hub.com/assets/www/index.html")
+        webView.loadUrl("https://weather.arc360hub.com")
     }
 }
